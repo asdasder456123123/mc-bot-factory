@@ -76,6 +76,7 @@ function createMcBot(ip, port, botName, version) {
                 host: ip,
                 port,
                 username: botName,
+                auth: "offline",
                 version:
                     version && version !== "auto"
                         ? version
