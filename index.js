@@ -101,6 +101,7 @@ function createMcBot(ip, port, botName, version, ownerId) {
 
         activeBots.set(botName, {
             bot: mcBot,
+            ownerId,
             stop: () => {
                 stopped = true;
 
@@ -108,6 +109,12 @@ function createMcBot(ip, port, botName, version, ownerId) {
                     clearTimeout(reconnectTimer);
                     reconnectTimer = null;
                 }
+
+                botOwners.delete(botName);
+                botHealth.delete(botName);
+                alertState.delete(botName);
+                warnedBots.delete(botName);
+                activeBots.delete(botName);
 
                 try {
                     mcBot.quit();
@@ -399,6 +406,53 @@ client.on("messageCreate", (message) => {
         );
     }
 
+    if (command === "!mybots") {
+        const myBots = [...botOwners.entries()]
+            .filter(([_, ownerId]) => ownerId === message.author.id)
+            .map(([botName]) => botName);
+
+        if (myBots.length === 0) {
+            return message.reply(
+                "📭 معندكش أي Minecraft bots شغالة حاليًا."
+            );
+        }
+
+        return message.reply(
+            `🤖 **البوتات بتاعتك (${myBots.length}/${MAX_BOTS_PER_USER})**\\n\\n` +
+            myBots.map(name => `• **${name}**`).join("\\n")
+        );
+    }
+
+    if (command === "!stop") {
+        const botName = normalizeBotName(args[0] || "");
+
+        if (!botName) {
+            return message.reply(
+                "❌ الاستخدام الصحيح: `!stop <BOT_NAME>`"
+            );
+        }
+
+        const info = activeBots.get(botName);
+
+        if (!info) {
+            return message.reply(
+                `❌ الروبوت **${botName}** مش شغال حاليًا.`
+            );
+        }
+
+        if (botOwners.get(botName) !== message.author.id) {
+            return message.reply(
+                "🚫 مينفعش توقف روبوت مش بتاعك."
+            );
+        }
+
+        info.stop();
+
+        return message.reply(
+            `🛑 تم إيقاف الروبوت **${botName}** وتحرير مكان من حد البوتات.`
+        );
+    }
+
     if (command !== "!start") return;
 
     const ip = args[0];
@@ -427,10 +481,20 @@ client.on("messageCreate", (message) => {
         .length;
 
     if (userBotCount >= MAX_BOTS_PER_USER) {
+        const myBots = [...botOwners.entries()]
+            .filter(([_, id]) => id === ownerId)
+            .map(([name]) => name);
+
         return message.reply(
-            `🚫 **وصلت للحد الأقصى.**\n` +
-            `مسموح لك بتشغيل **${MAX_BOTS_PER_USER} روبوتات Minecraft فقط**.\n` +
-            `أوقف أحد روبوتاتك أولًا لتشغيل روبوت جديد.`
+            `🚫 **وصلت للحد الأقصى (${MAX_BOTS_PER_USER}/${MAX_BOTS_PER_USER})**\\n\\n` +
+            `🤖 **البوتات بتاعتك:**\\n` +
+            myBots.map(name => `• **${name}**`).join("\\n") +
+            `\\n\\n🛑 **إيقاف بوت:**\\n` +
+            `\`!stop <BOT_NAME>\`\\n\\n` +
+            `📋 **عرض بوتاتك:**\\n` +
+            `\`!mybots\`\\n\\n` +
+            `▶️ **تشغيل بوت بعد إيقاف واحد:**\\n` +
+            `\`!start <IP> <PORT> <BOT_NAME> [VERSION]\``
         );
     }
 
