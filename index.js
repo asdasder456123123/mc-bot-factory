@@ -15,6 +15,8 @@ const activeBots = new Map();
 const botHealth = new Map();
 const alertState = new Map();
 const warnedBots = new Set();
+const botOwners = new Map(); // botName -> Discord user ID
+const MAX_BOTS_PER_USER = 2;
 
 const AUTH_PASS = "0.963852963";
 const ALERT_CHANNEL_ID = "1544256191864250388";
@@ -47,10 +49,12 @@ async function sendFirstWarning(botName) {
     );
 }
 
-function createMcBot(ip, port, botName, version) {
+function createMcBot(ip, port, botName, version, ownerId) {
     botName = normalizeBotName(botName);
 
     if (activeBots.has(botName)) return;
+
+    botOwners.set(botName, ownerId);
 
     let reconnectTimer = null;
     let stopped = false;
@@ -410,10 +414,23 @@ client.on("messageCreate", (message) => {
     }
 
     const botName = normalizeBotName(requestedName);
+    const ownerId = message.author.id;
 
     if (activeBots.has(botName)) {
         return message.reply(
             `⚠️ الروبوت **${botName}** شغال بالفعل!`
+        );
+    }
+
+    const userBotCount = [...botOwners.values()]
+        .filter(id => id === ownerId)
+        .length;
+
+    if (userBotCount >= MAX_BOTS_PER_USER) {
+        return message.reply(
+            `🚫 **وصلت للحد الأقصى.**\n` +
+            `مسموح لك بتشغيل **${MAX_BOTS_PER_USER} روبوتات Minecraft فقط**.\n` +
+            `أوقف أحد روبوتاتك أولًا لتشغيل روبوت جديد.`
         );
     }
 
@@ -426,7 +443,8 @@ client.on("messageCreate", (message) => {
         ip,
         port,
         botName,
-        version
+        version,
+        ownerId
     );
 });
 
